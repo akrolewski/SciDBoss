@@ -1,0 +1,219 @@
+\documentclass[12pt]{aastex}
+
+\makeatletter
+\let\@dates\relax
+\makeatother
+
+
+\usepackage{epsfig,amsfonts,amsmath,url,xcolor,wasysym,wrapfig,booktabs,placeins,float,braket,xspace,soul}
+\usepackage[T1]{fontenc}
+%\usepackage{setspace}
+
+%\singlespacing
+\linespread{1.0}
+
+\begin{document}
+
+\title{SciDBoss Documentation}
+
+\begin{section}{Quasar sample}
+
+I used a testing sample of 5000 quasars from the DR12 catalog (\url{http://www.sdss.org/dr12/algorithms/boss-dr12-quasar-catalog/}).
+These quasars were required to have $2.15 < z < 5$ (using $Z\_VI$) and $BAL\_FLAG\_VI = 0$; that is, they were required to have no visually apparent
+broad absorption line troughs.  From this set I randomly selected 5000 quasars and downloaded the spec files for each of these quasars,
+from \url{http://data.sdss3.org/sas/dr12/boss/spectro/redux/ %d/spectra/%04d/spec-%04d-%05d-%04d.fits % (rerun, plate, plate, mjd)} 
+(see \url{https://www.sdss3.org/dr9/spectro/pipeline.php} for a description, under "per object spec files").  For each quasar I used the coadded data combining each exposure.
+These data are stored in the fits file $boss\_test\_sample.fits$ and in the directory $boss\_test\_sample$.  The function loading all the data is $load\_all\_data$ within
+$lya\_functions.py$.  I also mask the data by rejecting any pixel with the $AND\_MASK > 0$ (see \url{http://www.sdss.org/dr12/algorithms/bitmasks/#SPPIXMASK} for a description of the pixel maskbits; the $AND\_MASK$
+means that the maskbit was set for any of the exposures within the coadd, not necessarily all).  Since the SDSS sky subtraction is often inadequate around bright night
+sky lines, I additionally mask 6 \AA\ on either side of the night sky lines at 5577 \AA, 6300 \AA, 6363 \AA, and the ISM sodium D line at 5890 \AA.
+The function doing this masking is $mask\_data$ in $lya\_functions.py$.
+% should we use the spec-lyas? read Lee paper.  i think they were processed differently
+
+\end{section}
+
+\begin{section}{Finding <F(z)>}
+
+As a first step, I fit a model of the following form to each quasar spectrum:
+\begin{equation}
+f(\lambda) = A_{qso} \bar{C}(\lambda_{r}) <F(z_{abs})>
+\label{eqn:model}
+\end{equation}
+where $\bar{C}(\lambda_{r})$ is the mean quasar continuum, $A_{qso}$ is the amplitude of each individual quasar, and $<F(z_{abs})>$ is the
+mean transmitted flux fraction through the Ly$\alpha$ forest.  This model assumes that all quasars have the same shape and does not consider
+fluctuations from the mean transmission.
+
+Rather than fitting this model in one go I proceed iteratively.  In the first iteration I take the mean continuum to be 1:
+\begin{equation}
+\bar{C}_0(\lambda_{r}) = 1
+\label{eqn:c0}
+\end{equation}
+The mean continuum is defined over a specified grid; for now, the grid starts at 600 \AA, ends at 3600 \AA, and has spacing of 4 \AA\ between points.
+I use the Faucher-Giguere 2008 model as a rough estimate for $<F(z)>$ (the analytic fit cited in the Font-Ribera DLA paper):
+\begin{equation}
+<F(z)_0> = \exp{[-0.0018(1+z)^{3.92}]}
+\label{eqn:fz0}
+\end{equation}
+$<F(z)>$ is defined in a grid where each point has $\Delta z$ = 0.03, and spans a total width of 1.5 in redshift.  The beginning of $<F(z)>$ is the
+lowest measurable absorption redshift: the blue end SDSS spectroscopic limit, 3566.97 \AA, divided by Ly$\alpha$, 1215.24 \AA, minus 1.
+
+Last, I find the initial quasar amplitude by finding the weighted mean of the quasar flux between 1275 and 1285 \AA.
+\begin{equation}
+A_{qso,0} = \frac{\sum f_i w_i}{\sum w_i}
+\label{eqn:a0}
+\end{equation}
+$w_i$ is the weight of each pixel, calculated from its total inverse variance:
+\begin{equation}
+w_i = \left(\sigma_{pipe}^2 + f_i^2 \sigma_{i}^2\right)^{-1}
+\label{eqn:wt_for_a0}
+\end{equation}
+where $\sigma_{pipe}^2$ is the variance outputted by the SDSS pipeline (from the spec file) and $\sigma_{i}^2$ is the intrinsic variance,
+a step function
+\begin{equation}
+\sigma_i^2 = 
+\begin{cases}
+0.1 & \text{if } \lambda_r < 1215.24 \\
+0.01 & \text{if } \lambda_r > 1215.24
+\end{cases}
+\end{equation}
+Note that $\sigma_i^2$ is dimensionless.  We need $\sigma_{i}^2$ for two reasons.
+First, there is intrinsic variance associated with the transmission fraction in the Lyman$\alpha$ forest (due to cosmic structure)
+so even a high S/N quasar should have some floor to its variance in the Lyman$\alpha$ forest region.
+Second, we need an intrinsic variance to prevent high S/N quasars from being weighted too heavily; if we had no intrinsic variance,
+then the mean continuum would be heavily biased towards high S/N quasars.  Note also the units of the weight: since the weights are inverse-variance
+weights, their units are flux$^{-2}$.
+
+%The other tricky part in this equation is the division
+%by $f_{norm}$ to produce a normalized variance. Ideally I would divide $\sigma_{pipe}^2$ by the square of the estimated continuum flux.
+%Note that you should not divide $\sigma_{pipe}^2$ by $f_i^2$.  In the Lyman-alpha forest, $\sigma_{pipe}^2$ may be $>> f_i^2$ (since some pixels may have close to zero flux).
+%This weight would effectively exclude these pixels and bias the estimate of the mean continuum too high.  So we must use an estimate
+%for the continuum flux instead of $f_i$ in the weights; because no better estimate exists in the first iteration, I simply use $f_{norm}$.  in future
+%iterations, I will replace $f_{norm}$ with $\bar{C}_i$ from the previous iteration.
+
+Now I begin to iterate.  First I compute $\bar{C}$:
+\begin{equation}
+%\bar{C}(\lambda_r}_{i} = \frac{\sum_j w_j \frac{f_j}{A_{qso, i} \bar{F}(z)_{i,j}}}{\sum_j w_j}
+\bar{C}(\lambda_r)_{i} = \frac{\sum_j w_j \frac{f_j}{A_{qso,i-1} \bar{F}(z)_{i-1,j}}}{\sum_j w_j}
+\label{eqn:c_i}
+\end{equation}
+ The weights are equal to the total inverse variance of the quantity being averaged
+\begin{equation}
+w = \left(\frac{\sigma_{pipe}^2}{A_{qso,i-1}^2 <F(z)>_{i-1}^2} + \bar{C}_{i-1} \sigma_i^2\right)^{-1}
+\label{eqn:wt_for_c_i}
+\end{equation}
+Note that I use the $(i-1)$th estimates of $A_{qso}$, $<F(z)>$ and $\bar{C}$. 
+For any pixel with $z_{abs} > z_{max} + \Delta z/2$, I have no estimate of $<F(z)>_{i-1}$, so I use
+the Faucher-Giguere estimate at these redshifts for all iterations.
+
+Next I compute $A_{qso}$.  Here I use a chisq minimization that is formally identical to the weighted average but is easier to implement
+if I switch to using a multi-parameter model for the continuum.
+Specifically I only fit to the region red of Ly$\alpha$,
+and I use weighted least squares to properly account for the different variances between different pixels; the weights are given by:
+\begin{equation}
+w = \sqrt{\left(\frac{\sigma_{pipe}^2}{<F(z)>_{i-1}^2} + A_{qso,i-1}^2 \bar{C}_{i}^2 \sigma_i^2\right)^{-1}}
+\label{eqn:wt_for_least_squares}
+\end{equation}
+% (in general a re-read and check-thru of the code is a good idea! make sure that it is consistent with what I've written here)
+in other words the inverse of the standard deviation of each pixel, in units of flux$^{-1}$.
+Note also that $<F(z)>_{i-1}$ will always be equal to 1 since we only fit red of Ly$\alpha$.
+Written in matrix form we then solve
+\begin{equation}
+W \vec{T} A_{qso} = W \vec{f}
+\label{eqn:lls}
+\end{equation}
+where $W$ is the diagonal matrix of the weights, $\vec{T}$ is the template ($\bar{C}(\lambda_r)_i$ re-binned to the quasar wavelengths), $\vec{f}$ is the measured fluxes, 
+and $A_{qso}$ is the scalar amplitude that we're fitting for.  This is a least squares problem of the form $\vec{a} X = \vec{b}$ so it can be
+solved quickly by already-existing libraries to find $A_{qso}$.
+
+Now I find $<F(z)>$.  I consider only the region between
+1041 \AA\ and 1185 \AA rest frame.  I assign each pixel
+to the nearest $z_{abs}$ and calculate $<F(z)>$ in the following way:
+\begin{equation}
+<F(z)>_i = \frac{\sum_j w_j \frac{f_j}{A_{qso,i} \bar{C}_i}}{\sum w_j}
+\label{eqn:fz}
+\end{equation}
+where now $w_j$ is given by
+\begin{equation}
+w_j = \left(\frac{\sigma_{pipe}^2}{(A_{qso,i} \bar{C}_i)^2} + <F(z)>_{i-1}^2\sigma_{i}^2\right)^{-1}
+\label{eqn:w_for_fz}
+\end{equation}
+I also calculate the error on each measurement of $<F(z)>$:
+\begin{equation}
+\sigma^2_F = \frac{1}{\sum{w_i}}
+\label{eqn:fz_error}
+\end{equation}
+This follows from the variance of a weighted mean (see appendix).  Also, $<F(z)>$ is fixed in order to break the degeneracy
+between $<F(z)>$ and $\bar{C}$ in the Ly$\alpha$ forest region.  I fix the mean of $<F(z)>$ between $z = 2.2$ and $z = 2.6$
+to equal the mean of Faucher-Giguere's measurement of $<F(z)>$ between 2.2 and 2.6.
+
+To measure convergence, I calculate a "chisq" statistic:
+\begin{equation}
+\chi^2 = \sum \left(\frac{<F(z)>_{i}-<F(z)>_{i-1}}{\sigma_{Fi}}\right)^2
+\label{eqn:fz_chisq}
+\end{equation}
+where the sum runs over the redshift bins, and $i$ refers to the ith iteration.  Convergence is reached when this statistic
+is less than the number of redshift bins.
+
+\end{section}
+
+\begin{section}{Appendix: variance of a weighted mean}
+
+Consider the estimation of the mean and standard error for a set of data $x_i$ with weights $w_i$.
+These weights can
+be interpreted as non-integer ``counts'' of each data point.  For instance, a weight of 1.3 means that a particular datapoint
+is counted 1.3 times.
+
+Take the probability of obtaining a particular measurement $x_i$.  Assume this distribution is Gaussian:
+\begin{equation}
+P_{i}(\mu') \propto \exp{[-\frac{1}{2}(\frac{x_i-\mu'}{\sigma})^2]}
+\end{equation}
+The probability of observing the entire data set of $N$ observations is given by
+\begin{equation}
+P(\mu') = \prod^{N}{P_i(\mu')^{w_i}}
+\end{equation}
+We see that the interpretation of weights as effective counts means that we must raise each probability to the $w_i$ power.
+We thus have
+\begin{equation}
+P(\mu') \propto \exp{[-\frac{1}{2}\sum{w_i(\frac{x_i-\mu'}{\sigma})^2}]}
+\label{eqn:prob}
+\end{equation}
+
+According to the method of maximum likelihood, the most probable value for the mean is the value that maximizes
+the probability in equation~\ref{eqn:prob}.  This is equivalent to minimizing the argument of the exponential:
+\begin{equation}
+X = -\frac{1}{2}\sum{w_i(\frac{x_i-\mu'}{\sigma})^2}
+\end{equation}
+The minimization condition is
+\begin{equation}
+\frac{\partial X}{\partial \mu'} = 0
+\end{equation}
+yielding (after algebraic simplification)
+\begin{equation}
+\sum{w_i(x_i-\mu')} = 0
+\end{equation}
+or
+\begin{equation}
+\mu' =\frac{ \sum{w_i x_i}}{\sum{w_i}}
+\end{equation}
+This checks with our intuition.
+
+The standard error is given by
+\begin{equation}
+\sigma_{\mu}^2 = \sum{[\sigma_i^2(\frac{\partial \mu}{\partial x_i})^2]}
+\end{equation}
+using error propagation.  We have
+\begin{equation}
+\frac{\partial \mu}{\partial x_i} = \frac{\partial}{\partial x_i}(\frac{\sum{w_i x_i}}{\sum{w_i}}) = \frac{w_i}{\sum{w_i}}
+\end{equation}
+Thus
+\begin{equation}
+\sigma_{\mu}^2 = \sum{[\sigma_i^2(\frac{w_i}{\sum{w_i}})^2]}
+\end{equation}
+In our case the weights are equal to the inverse of the variance.  Therefore
+\begin{equation}
+\sigma_{\mu}^2 = \left(\frac{1}{\sum w_i}\right)^2 \sum \frac{w_i^2}{w_i} = \frac{1}{\sum w_i}
+\end{equation}
+
+\end{section}
+
+\end{document}
