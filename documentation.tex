@@ -55,7 +55,7 @@ I use the Faucher-Giguere 2008 model as a rough estimate for $<F(z)>$ (the analy
 \label{eqn:fz0}
 \end{equation}
 $<F(z)>$ is defined in a grid where each point has $\Delta z$ = 0.03, and spans a total width of 1.5 in redshift.  The beginning of $<F(z)>$ is the
-lowest measurable absorption redshift: the blue end SDSS spectroscopic limit, 3566.97 \AA, divided by Ly$\alpha$, 1215.24 \AA, minus 1.
+lowest measurable absorption redshift: the blue end SDSS spectroscopic limit, 3566.97 \AA, divided by Ly$\alpha$, 1215.67 \AA, minus 1.
 
 Last, I find the initial quasar amplitude by finding the weighted mean of the quasar flux between 1275 and 1285 \AA.
 \begin{equation}
@@ -72,8 +72,8 @@ a step function
 \begin{equation}
 \sigma_i^2 = 
 \begin{cases}
-0.1 & \text{if } \lambda_r < 1215.24 \\
-0.01 & \text{if } \lambda_r > 1215.24
+0.1 & \text{if } \lambda_r < 1215.67 \\
+0.01 & \text{if } \lambda_r > 1215.67
 \end{cases}
 \end{equation}
 Note that $\sigma_i^2$ is dimensionless.  We need $\sigma_{i}^2$ for two reasons.
@@ -98,12 +98,21 @@ Now I begin to iterate.  First I compute $\bar{C}$:
 \end{equation}
  The weights are equal to the total inverse variance of the quantity being averaged
 \begin{equation}
-w = \left(\frac{\sigma_{pipe}^2}{A_{qso,i-1}^2 <F(z)>_{i-1}^2} + \bar{C}_{i-1} \sigma_i^2\right)^{-1}
+w = \left(\frac{\sigma_{pipe}^2}{A_{qso,i-1}^2 <F(z)>_{i-1}^2} + \bar{C}_{i-1}^2 \sigma_i^2\right)^{-1}
 \label{eqn:wt_for_c_i}
 \end{equation}
 Note that I use the $(i-1)$th estimates of $A_{qso}$, $<F(z)>$ and $\bar{C}$. 
 For any pixel with $z_{abs} > z_{max} + \Delta z/2$, I have no estimate of $<F(z)>_{i-1}$, so I use
 the Faucher-Giguere estimate at these redshifts for all iterations.
+
+I also fix the mean continuum to be 1 on average between 1275 and 1285 \AA, in order to break the degeneracy
+between mean continuum amplitude and individual quasar amplitude.
+
+In addition, I fix the blue-side slope of the mean continuum in order to break the degeneracy between
+blue-side slope and the slope of the mean transmission $<F(z)>$.  Following the PCA fits of Paris et al., 
+I require the continuum at 1050 \AA\ to be 25\% greater than the continuum at 1280 \AA; in both cases,
+the continuum flux at each point is computed by averaging over a box 10 \AA\ in width (e.g. a region 1045 to 1055 \AA\
+and a region 1275 to 1285 \AA).
 
 Next I compute $A_{qso}$.  Here I use a chisq minimization that is formally identical to the weighted average but is easier to implement
 if I switch to using a multi-parameter model for the continuum.

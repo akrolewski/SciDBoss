@@ -1,0 +1,7 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1348\cocoasubrtf170
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+\margl1440\margr1440\vieww10800\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+
+\f0\fs24 \cf0 I ran scaling tests to compare the SciDB script [run on wald with 16 cores] (main_scidb.py) to the Python script (main.py) [run on my laptop].  These two scripts follow 1 iteration of the iterative continuum-fitting process described in documentation.pdf.  I first tested the scaling with number of QSOs (using subsamples of the full test sample).  The python script scales linearly with the number of QSOs, while the scidb script scales linearly but with a relatively large overhead.  This overhead is not due to the initial removal of bad pixels (see main_scidb4_timing.rft: this step lasts 15 seconds compared to 140 seconds for the entire script).  This scaling implies that the SciDB implementation is much faster than the naive (non-parallelized) python implementation, particularly for large samples of quasars.  The overhead is likely intrinsic to the redimensioning and cross-joining in the scidb script.  I also performed scaling tests with the size of the wavelength bins and deltaz bins.  These showed no scaling in the scidb script, while the python script scaled inversely with the wavelength bin, but did not scale with the deltaz bin.}

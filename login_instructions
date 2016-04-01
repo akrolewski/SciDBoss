@@ -1,0 +1,21 @@
+How to login and get scidb running:
+
+ssh username@wald.nersc.gov
+(you will need an account on wald to do this.)
+
+then type the following once logged into wald:
+module load globus
+myproxy-logon -s nerscca.nersc.gov
+(passphrase = your NERSC password)
+gsissh localhost -l scidboss
+ssh scidboss@wald.nersc.gov
+
+once logged in as the scidboss user, type
+export CHOS=default
+
+then type:
+setupsdb (alias for source ./setup.sh)
+
+to start and stop the instance:
+./startall
+./stopall

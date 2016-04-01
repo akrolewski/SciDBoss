@@ -1,0 +1,30 @@
+Description of files:
+
+SciDB:
+login_instructions: describes how to log into scidb
+load_boss_test_sample: commands for loading the test sample
+
+main_scidb.py: runs 1 iteration of the continuum-fitting script, using SciDB.  folows the procedure described in documentation.pdf
+
+main_scidb4_timing.rtf: describes the time it takes for the scidb script to reach different milestones in the script.
+Scaling_Test.xlsx: scaling test for the scidb and python scripts
+scaling_test.rtf: describes the outcome of the scaling tests
+
+Python:
+boss_test_sample.fits: fits file describing the 5000 quasars in the test sample.  This is a portion of the DR12 catalog.
+boss_test_sample: the 5000 quasar spectra
+
+main.py: runs the continuum-fitting script using python. follows the procedure described in documentation.pdf
+lya_functions.py: called by main.py for the python continuum-fitting.
+find_fz.py: called by main.py for the python continuum-fitting.
+mean_continuum.py: called by main.py for the python continuum-fitting.
+
+run2: contains plots and data figures from the execution of main.py.
+the final figures are continuum_3.pdf and fz_3.pdf.  the "quasars" folder
+contains plots of the fit from each quasar, sorted by chisq.
+
+Documentation:
+documentation.pdf: describes the continuum fitting procedure
+
+To make pretty plots:
+prettyplot.py

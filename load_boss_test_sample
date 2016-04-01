@@ -1,0 +1,4 @@
+# provides IQUERY commands for loading the single-csv BOSS test sample
+
+$IQUERY -aq "create array boss_test_sample <loglambda:float,flux:float,ivar:float,andmask:int64> [i]"
+$IQUERY -aq "load(boss_test_sample, '/global/homes/s/scidboss/data/boss_test_sample.csv', -2, 'csv')"
